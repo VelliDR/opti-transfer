@@ -10,14 +10,14 @@ export const COLOR_MAP = {
 };
 
 export class MatrixEncoder {
-    constructor(canvas, gridSize = 16) {
+    constructor(canvas, gridSize = 24) { // 16 yerine 24 yapıldı
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.gridSize = gridSize;
         this.timerId = null;
         this.currentFrame = 0;
         this.packets = [];
-        this.fps = 15;
+        this.fps = 20; // Varsayılan FPS'i 20 yaptık
     }
 
     setPackets(packets) {

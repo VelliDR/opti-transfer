@@ -1,114 +1,166 @@
-/**
- * Web Worker - Akıllı Kadranlı Renkli Matris İşleyici
- */
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optik Transfer PWA</title>
+    <!-- Material Symbols & Google Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header & Material 3 Segmented Navigation -->
+        <header class="app-header">
+            <h1 class="app-title">OptiTransfer</h1>
+            <p class="app-subtitle">Air-Gapped Optik Veri Taşıma</p>
+            <div class="m3-segmented-button">
+                <button id="btnTabSender" class="segmented-item active">
+                    <span>Gönderici</span>
+                </button>
+                <button id="btnTabReceiver" class="segmented-item">
+                    <span>Alıcı</span>
+                </button>
+            </div>
+        </header>
 
-function classifyColor(r, g, b) {
-    if (r < 80 && g < 80 && b < 80) return '00';
-    if (r > 130 && g > 130 && b > 130) return '01';
-    if (r > g + 30 && r > b + 30) return '10';
-    if (b > r + 30 && b > g + 30) return '11';
-    return '00';
-}
+        <main class="app-content">
+            <!-- ================= GÖNDERİCİ PANELİ (SEKME 1) ================= -->
+            <section id="senderPanel" class="m3-card panel">
+                <h2 class="panel-title">Veri Gönder</h2>
 
-function findCornerPoints(width, height, data) {
-    const step = 4;
-    const halfW = width / 2;
-    const halfH = height / 2;
+                <!-- Parolasız Geçiş Switch -->
+                <div class="m3-switch-row">
+                    <label class="switch-label" for="toggleNoPasswordSend">
+                        <span>Parolasız Taşıma</span>
+                        <small>Şifreleme parolası girmeden hızlıca aktar</small>
+                    </label>
+                    <label class="m3-switch">
+                        <input type="checkbox" id="toggleNoPasswordSend">
+                        <span class="slider"></span>
+                    </label>
+                </div>
 
-    let maxRed = -Infinity, tl = null;
-    let maxGreen = -Infinity, tr = null;
-    let maxBlue = -Infinity, bl = null;
-    let maxWhite = -Infinity, br = null;
+                <div class="m3-input-group">
+                    <label class="input-label">Dosya Seçin</label>
+                    <input type="file" id="fileInput" class="m3-file-input">
+                </div>
 
-    for (let y = 0; y < height; y += step) {
-        for (let x = 0; x < width; x += step) {
-            const idx = (y * width + x) * 4;
-            const r = data[idx];
-            const g = data[idx + 1];
-            const b = data[idx + 2];
+                <div class="m3-input-group" id="sendPasswordGroup">
+                    <label class="input-label" for="passwordInput">Güvenlik Parolası</label>
+                    <input type="password" id="passwordInput" class="m3-text-input" placeholder="AES-256 Parolası">
+                </div>
 
-            // 1. Sol-Üst Kadran (Sadece Kırmızı Ara)
-            if (x < halfW && y < halfH) {
-                const redScore = r - (g + b) / 2;
-                if (redScore > maxRed) { maxRed = redScore; tl = { x, y }; }
-            }
-            // 2. Sağ-Üst Kadran (Sadece Yeşil Ara)
-            else if (x >= halfW && y < halfH) {
-                const greenScore = g - (r + b) / 2;
-                if (greenScore > maxGreen) { maxGreen = greenScore; tr = { x, y }; }
-            }
-            // 3. Sol-Alt Kadran (Sadece Mavi Ara)
-            else if (x < halfW && y >= halfH) {
-                const blueScore = b - (r + g) / 2;
-                if (blueScore > maxBlue) { maxBlue = blueScore; bl = { x, y }; }
-            }
-            // 4. Sağ-Alt Kadran (Sadece Beyaz Ara)
-            else if (x >= halfW && y >= halfH) {
-                const whiteScore = r + g + b;
-                if (whiteScore > maxWhite) { maxWhite = whiteScore; br = { x, y }; }
-            }
-        }
-    }
+                <div class="m3-input-group">
+                    <div class="slider-header">
+                        <label class="input-label">Ekran Yenileme Hızı</label>
+                        <span id="fpsDisplay" class="m3-badge">15 FPS</span>
+                    </div>
+                    <input type="range" id="fpsRange" min="1" max="60" value="15" class="m3-slider">
+                </div>
 
-    if (maxRed < 30 || maxGreen < 30 || maxBlue < 30) return null;
-    return { tl, tr, bl, br };
-}
+                <div class="m3-button-row">
+                    <button id="btnStartSend" class="m3-btn m3-btn-primary">Yayını Başlat</button>
+                    <button id="btnStopSend" class="m3-btn m3-btn-outlined" disabled>Durdur</button>
+                </div>
 
-function getInterpolatedPoint(u, v, corners) {
-    const x = (1 - u) * (1 - v) * corners.tl.x +
-              u * (1 - v) * corners.tr.x +
-              (1 - u) * v * corners.bl.x +
-              u * v * corners.br.x;
+                <!-- Dosya ve Transfer Bilgi Kutuları -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Dosya Adı</span>
+                        <span id="statSendFileName" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Dosya Boyutu</span>
+                        <span id="statSendFileSize" class="stat-value">0 KB</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Toplam Paket</span>
+                        <span id="statSendTotalPackets" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Aktarım Türü</span>
+                        <span id="statSendMode" class="stat-value">Şifreli</span>
+                    </div>
+                </div>
 
-    const y = (1 - u) * (1 - v) * corners.tl.y +
-              u * (1 - v) * corners.tr.y +
-              (1 - u) * v * corners.bl.y +
-              u * v * corners.br.y;
+                <!-- Canvas Çerçevesi -->
+                <div class="visualizer-container">
+                    <canvas id="matrixCanvas" width="320" height="320"></canvas>
+                </div>
+                
+                <div id="senderStatus" class="m3-status-bar">Hazır</div>
+            </section>
 
-    return { x: Math.floor(x), y: Math.floor(y) };
-}
+            <!-- ================= ALICI PANELİ (SEKME 2) ================= -->
+            <section id="receiverPanel" class="m3-card panel" style="display: none;">
+                <h2 class="panel-title">Veri Al</h2>
 
-self.onmessage = function (e) {
-    const { imgData, width, height, gridSize } = e.data;
-    const corners = findCornerPoints(width, height, imgData);
-    let bitString = "";
+                <!-- Kamera Seçimi -->
+                <div class="m3-input-group">
+                    <label class="input-label" for="cameraSelect">Kamera Seçimi</label>
+                    <select id="cameraSelect" class="m3-text-input"></select>
+                </div>
 
-    const targetGrid = gridSize || 16;
+                <!-- Parolasız Geçiş Switch -->
+                <div class="m3-switch-row">
+                    <label class="switch-label" for="toggleNoPasswordReceive">
+                        <span>Parolasız Alma</span>
+                        <small>Karşı taraf parolasız gönderdiyse açın</small>
+                    </label>
+                    <label class="m3-switch">
+                        <input type="checkbox" id="toggleNoPasswordReceive">
+                        <span class="slider"></span>
+                    </label>
+                </div>
 
-    for (let row = 0; row < targetGrid; row++) {
-        for (let col = 0; col < targetGrid; col++) {
-            if ((row === 0 && col === 0) || 
-                (row === 0 && col === targetGrid - 1) || 
-                (row === targetGrid - 1 && col === 0) || 
-                (row === targetGrid - 1 && col === targetGrid - 1)) {
-                continue;
-            }
+                <div class="m3-input-group" id="receivePasswordGroup">
+                    <label class="input-label" for="decryptPasswordInput">Şifre Çözme Parolası</label>
+                    <input type="password" id="decryptPasswordInput" class="m3-text-input" placeholder="Gönderici Parolası">
+                </div>
 
-            let px, py;
-            if (corners) {
-                const u = (col + 0.5) / targetGrid;
-                const v = (row + 0.5) / targetGrid;
-                const pt = getInterpolatedPoint(u, v, corners);
-                px = pt.x;
-                py = pt.y;
-            } else {
-                const cellSizeX = width / targetGrid;
-                const cellSizeY = height / targetGrid;
-                px = Math.floor(col * cellSizeX + cellSizeX / 2);
-                py = Math.floor(row * cellSizeY + cellSizeY / 2);
-            }
+                <div class="m3-button-row">
+                    <button id="btnStartCamera" class="m3-btn m3-btn-primary">Kamerayı Aç</button>
+                    <button id="btnToggleTorch" class="m3-btn m3-btn-outlined" disabled>Flaş Aç</button>
+                    <button id="btnStopCamera" class="m3-btn m3-btn-outlined" disabled>Kapat</button>
+                </div>
 
-            if (px >= 0 && px < width && py >= 0 && py < height) {
-                const idx = (py * width + px) * 4;
-                const r = imgData[idx];
-                const g = imgData[idx + 1];
-                const b = imgData[idx + 2];
-                bitString += classifyColor(r, g, b);
-            } else {
-                bitString += '00';
-            }
-        }
-    }
+                <!-- İlerleme Çubuğu -->
+                <div class="m3-progress-container">
+                    <div id="m3ProgressBar" class="m3-progress-bar"></div>
+                </div>
 
-    self.postMessage({ bitString });
-};
+                <!-- Canlı Transfer İstatistik Kutuları -->
+                <div class="stats-grid">
+                    <div class="stat-card highlight">
+                        <span class="stat-label">Transfer Hızı</span>
+                        <span id="statSpeed" class="stat-value">0.0 KB/s</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Geçen Süre</span>
+                        <span id="statElapsedTime" class="stat-value">0s</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Alınan Veri</span>
+                        <span id="statReceivedBytes" class="stat-value">0 KB</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Paket İlerlemesi</span>
+                        <span id="statPacketsRatio" class="stat-value">0 / 0</span>
+                    </div>
+                </div>
+
+                <!-- Kamera Görünümü -->
+                <div class="visualizer-container">
+                    <video id="cameraVideo" autoplay playsinline muted></video>
+                    <canvas id="processCanvas" style="display: none;"></canvas>
+                </div>
+
+                <div id="receiverStatus" class="m3-status-bar">Kamera Kapalı</div>
+            </section>
+        </main>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
