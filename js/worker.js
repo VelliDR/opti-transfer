@@ -1,10 +1,10 @@
 /**
- * Web Worker - Arka Plan Görüntü İşleme & Renk Çözücü
+ * Web Worker - Akıllı Kadran Kısıtlı Renk Çözücü
  */
 
 function classifyColor(r, g, b) {
     if (r < 80 && g < 80 && b < 80) return '00';
-    if (r > 140 && g > 140 && b > 140) return '01';
+    if (r > 130 && g > 130 && b > 130) return '01';
     if (r > g + 30 && r > b + 30) return '10';
     if (b > r + 30 && b > g + 30) return '11';
     return '00';
@@ -12,6 +12,9 @@ function classifyColor(r, g, b) {
 
 function findCornerPoints(width, height, data) {
     const step = 4;
+    const halfW = width / 2;
+    const halfH = height / 2;
+
     let maxRed = -Infinity, tl = null;
     let maxGreen = -Infinity, tr = null;
     let maxBlue = -Infinity, bl = null;
@@ -24,15 +27,26 @@ function findCornerPoints(width, height, data) {
             const g = data[idx + 1];
             const b = data[idx + 2];
 
-            const redScore = r - (g + b) / 2;
-            const greenScore = g - (r + b) / 2;
-            const blueScore = b - (r + g) / 2;
-            const whiteScore = r + g + b;
-
-            if (redScore > maxRed) { maxRed = redScore; tl = { x, y }; }
-            if (greenScore > maxGreen) { maxGreen = greenScore; tr = { x, y }; }
-            if (blueScore > maxBlue) { maxBlue = blueScore; bl = { x, y }; }
-            if (whiteScore > maxWhite) { maxWhite = whiteScore; br = { x, y }; }
+            // 1. Sol-Üst Kadran (Sadece Kırmızı)
+            if (x < halfW && y < halfH) {
+                const redScore = r - (g + b) / 2;
+                if (redScore > maxRed) { maxRed = redScore; tl = { x, y }; }
+            }
+            // 2. Sağ-Üst Kadran (Sadece Yeşil)
+            else if (x >= halfW && y < halfH) {
+                const greenScore = g - (r + b) / 2;
+                if (greenScore > maxGreen) { maxGreen = greenScore; tr = { x, y }; }
+            }
+            // 3. Sol-Alt Kadran (Sadece Mavi)
+            else if (x < halfW && y >= halfH) {
+                const blueScore = b - (r + g) / 2;
+                if (blueScore > maxBlue) { maxBlue = blueScore; bl = { x, y }; }
+            }
+            // 4. Sağ-Alt Kadran (Sadece Beyaz)
+            else if (x >= halfW && y >= halfH) {
+                const whiteScore = r + g + b;
+                if (whiteScore > maxWhite) { maxWhite = whiteScore; br = { x, y }; }
+            }
         }
     }
 

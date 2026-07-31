@@ -1,4 +1,4 @@
-const CACHE_NAME = 'opti-transfer-v1';
+const CACHE_NAME = 'opti-transfer-v1.20';
 const ASSETS = [
   './',
   './index.html',

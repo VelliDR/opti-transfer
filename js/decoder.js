@@ -1,5 +1,5 @@
 /**
- * Kamera Taraması, Web Worker Entegrasyonu ve Donanım Kontrol Modülü
+ * Kamera Taraması, Web Worker Entegrasyonu ve Donanım Yöneticisi
  */
 
 import { parsePacket } from './chunker.js';
@@ -19,15 +19,12 @@ export class MatrixDecoder {
         this.stream = null;
         this.animFrameId = null;
 
-        // Flaş ve Donanım
         this.torchState = false;
 
-        // Worker Kurulumu
         this.worker = new Worker('js/worker.js');
         this.isWorkerBusy = false;
         this.setupWorker();
 
-        // Metrikler
         this.startTime = null;
         this.totalBytesReceived = 0;
     }
@@ -120,7 +117,6 @@ export class MatrixDecoder {
 
             const imgData = this.ctx.getImageData(0, 0, width, height);
             
-            // Veriyi Worker'a gönder (UI kasmadan işlenir)
             this.isWorkerBusy = true;
             this.worker.postMessage({
                 imgData: imgData.data,
@@ -143,10 +139,19 @@ export class MatrixDecoder {
         }
 
         const parsed = parsePacket(new Uint8Array(bytes));
-        if (parsed && parsed.totalPackets > 0 && parsed.packetIndex < parsed.totalPackets) {
-            
+        
+        if (parsed) {
+            // Mantıksız paket sayılarını reddet (65535 Koruması)
+            if (parsed.totalPackets <= 0 || parsed.totalPackets > 5000) return;
+            if (parsed.packetIndex >= parsed.totalPackets) return;
+
+            if (this.totalPackets === 0) {
+                this.totalPackets = parsed.totalPackets;
+            } else if (parsed.totalPackets !== this.totalPackets) {
+                return;
+            }
+
             if (!this.startTime) this.startTime = performance.now();
-            if (this.totalPackets === 0) this.totalPackets = parsed.totalPackets;
 
             if (!this.receivedPackets.has(parsed.packetIndex)) {
                 this.receivedPackets.set(parsed.packetIndex, parsed.payload);

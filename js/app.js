@@ -11,34 +11,26 @@ const DEFAULT_NO_PASS_KEY = "OPTICAL_TRANSFER_DEFAULT_NO_PASS_SECRET";
 
 document.addEventListener('DOMContentLoaded', () => {
     
-   // --- SEKMELER (TABS) YÖNETİMİ ---
-const btnTabSender = document.getElementById('btnTabSender');
-const btnTabReceiver = document.getElementById('btnTabReceiver');
-const senderPanel = document.getElementById('senderPanel');
-const receiverPanel = document.getElementById('receiverPanel');
+    // --- 1. SEKMELER YÖNETİMİ ---
+    const btnTabSender = document.getElementById('btnTabSender');
+    const btnTabReceiver = document.getElementById('btnTabReceiver');
+    const senderPanel = document.getElementById('senderPanel');
+    const receiverPanel = document.getElementById('receiverPanel');
 
-btnTabSender.addEventListener('click', () => {
-    btnTabSender.classList.add('active');
-    btnTabReceiver.classList.remove('active');
-    
-    // Göndericiyi göster, Alıcıyı gizle
-    senderPanel.style.display = 'flex';
-    receiverPanel.style.display = 'none';
-});
+    btnTabSender.addEventListener('click', () => {
+        btnTabSender.classList.add('active');
+        btnTabReceiver.classList.remove('active');
+        senderPanel.style.display = 'flex';
+        receiverPanel.style.display = 'none';
+    });
 
-btnTabReceiver.addEventListener('click', () => {
-    btnTabReceiver.classList.add('active');
-    btnTabSender.classList.remove('active');
-    
-    // Alıcıyı göster, Göndericiyi gizle
-    senderPanel.style.display = 'none';
-    receiverPanel.style.display = 'flex';
-
-    // Kameraları doldur
-    if (typeof loadCameras === 'function') {
+    btnTabReceiver.addEventListener('click', () => {
+        btnTabReceiver.classList.add('active');
+        btnTabSender.classList.remove('active');
+        senderPanel.style.display = 'none';
+        receiverPanel.style.display = 'flex';
         loadCameras();
-    }
-});
+    });
 
     // --- 2. PAROLASIZ SWİTCH MANTIĞI ---
     const toggleNoPasswordSend = document.getElementById('toggleNoPasswordSend');
@@ -61,7 +53,7 @@ btnTabReceiver.addEventListener('click', () => {
         receivePasswordGroup.style.display = e.target.checked ? 'none' : 'flex';
     });
 
-    // --- 3. GÖNDERİCİ ENTEGRASYONU ---
+    // --- 3. GÖNDERİCİ MODÜLÜ ---
     const matrixCanvas = document.getElementById('matrixCanvas');
     const encoder = new MatrixEncoder(matrixCanvas);
 
@@ -108,14 +100,11 @@ btnTabReceiver.addEventListener('click', () => {
         try {
             senderStatus.textContent = "Metadata ekleniyor ve şifreleniyor...";
             
-            // 1. Dosyayı Metadata ile Paketle
             const packedBuffer = await packFileWithMetadata(file);
-
-            // 2. AES-256 Şifreleme
             const encryptedBytes = await encryptData(packedBuffer, password);
             
-            // 3. Matris Paketlerine Böl
-            const packets = chunkData(encryptedBytes, 135);
+            // Tam 57 baytlık paketleme (63 baytlık matris kapasitesine uyumlu)
+            const packets = chunkData(encryptedBytes, 57);
 
             statSendTotalPackets.textContent = packets.length;
 
@@ -138,16 +127,17 @@ btnTabReceiver.addEventListener('click', () => {
         senderStatus.textContent = "Yayın Durduruldu.";
     });
 
-    // --- 4. ALICI ENTEGRASYONU ---
+    // --- 4. ALICI MODÜLÜ ---
     const cameraVideo = document.getElementById('cameraVideo');
     const processCanvas = document.getElementById('processCanvas');
     const decryptPasswordInput = document.getElementById('decryptPasswordInput');
     const btnStartCamera = document.getElementById('btnStartCamera');
     const btnStopCamera = document.getElementById('btnStopCamera');
+    const btnToggleTorch = document.getElementById('btnToggleTorch');
+    const cameraSelect = document.getElementById('cameraSelect');
+    
     const receiverStatus = document.getElementById('receiverStatus');
     const m3ProgressBar = document.getElementById('m3ProgressBar');
-    const cameraSelect = document.getElementById('cameraSelect');
-const btnToggleTorch = document.getElementById('btnToggleTorch');
     const statSpeed = document.getElementById('statSpeed');
     const statElapsedTime = document.getElementById('statElapsedTime');
     const statReceivedBytes = document.getElementById('statReceivedBytes');
@@ -176,19 +166,16 @@ const btnToggleTorch = document.getElementById('btnToggleTorch');
             }
 
             try {
-                // 1. Şifreyi Çöz
                 const decryptedBuffer = await decryptData(completedBuffer, decryptPassword);
-                
-                // 2. Metadata ve Orijinal Dosya Baytlarını Ayrıştır
                 const { fileName, mimeType, fileData } = unpackFileWithMetadata(new Uint8Array(decryptedBuffer));
 
-                // 3. Orijinal İsim ve Tiple İndir
                 downloadFile(fileData, fileName, mimeType);
 
                 receiverStatus.textContent = `Başarılı! "${fileName}" indirildi.`;
                 decoder.stopCamera();
                 btnStartCamera.disabled = false;
                 btnStopCamera.disabled = true;
+                btnToggleTorch.disabled = true;
             } catch (err) {
                 console.error(err);
                 receiverStatus.textContent = "Şifre Çözme Hatası! Yanlış parola.";
@@ -196,66 +183,48 @@ const btnToggleTorch = document.getElementById('btnToggleTorch');
         }
     );
 
+    async function loadCameras() {
+        try {
+            const devices = await decoder.getCameraDevices();
+            cameraSelect.innerHTML = '';
+            devices.forEach((device, idx) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.textContent = device.label || `Kamera ${idx + 1}`;
+                cameraSelect.appendChild(option);
+            });
+        } catch (e) {
+            console.error("Kamera listesi alınamadı:", e);
+        }
+    }
+
     btnStartCamera.addEventListener('click', async () => {
-        const started = await decoder.startCamera();
+        const selectedDeviceId = cameraSelect.value;
+        const started = await decoder.startCamera(selectedDeviceId);
         if (started) {
             btnStartCamera.disabled = true;
             btnStopCamera.disabled = false;
+            btnToggleTorch.disabled = false;
             receiverStatus.textContent = "Kamera Aktif. Matrisi hizalayın...";
         } else {
             receiverStatus.textContent = "Kamera açılamadı!";
         }
     });
 
+    btnToggleTorch.addEventListener('click', async () => {
+        const isON = await decoder.toggleTorch();
+        btnToggleTorch.textContent = isON ? "Flaş Kapat" : "Flaş Aç";
+    });
+
     btnStopCamera.addEventListener('click', () => {
         decoder.stopCamera();
         btnStartCamera.disabled = false;
         btnStopCamera.disabled = true;
+        btnToggleTorch.disabled = true;
+        btnToggleTorch.textContent = "Flaş Aç";
         receiverStatus.textContent = "Kamera Kapalı.";
     });
 
-    // Mevcut Kameraları Listele
-async function loadCameras() {
-    const devices = await decoder.getCameraDevices();
-    cameraSelect.innerHTML = '';
-    devices.forEach((device, idx) => {
-        const option = document.createElement('option');
-        option.value = device.deviceId;
-        option.textContent = device.label || `Kamera ${idx + 1}`;
-        cameraSelect.appendChild(option);
-    });
-}
-
-btnStartCamera.addEventListener('click', async () => {
-    const selectedDeviceId = cameraSelect.value;
-    const started = await decoder.startCamera(selectedDeviceId);
-    if (started) {
-        btnStartCamera.disabled = true;
-        btnStopCamera.disabled = false;
-        btnToggleTorch.disabled = false;
-        receiverStatus.textContent = "Kamera Aktif. Matrisi hizalayın...";
-    }
-});
-
-btnToggleTorch.addEventListener('click', async () => {
-    const isON = await decoder.toggleTorch();
-    btnToggleTorch.textContent = isON ? "Flaş Kapat" : "Flaş Aç";
-});
-
-btnStopCamera.addEventListener('click', () => {
-    decoder.stopCamera();
-    btnStartCamera.disabled = false;
-    btnStopCamera.disabled = true;
-    btnToggleTorch.disabled = true;
-    btnToggleTorch.textContent = "Flaş Aç";
-    receiverStatus.textContent = "Kamera Kapalı.";
-});
-
-// Tab değiştiginde kameraları yükle
-btnTabReceiver.addEventListener('click', () => {
-    loadCameras();
-});
-    // İndirme İşlevi (MIME Type ve Orijinal İsim Desteğiyle)
     function downloadFile(buffer, filename, mimeType = 'application/octet-stream') {
         const blob = new Blob([buffer], { type: mimeType });
         const url = URL.createObjectURL(blob);
