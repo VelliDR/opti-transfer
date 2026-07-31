@@ -1,8 +1,17 @@
 /**
- * Paket Bölme, Başlık (Header) ve Metadata Yönetim Modülü
+ * Paket Bölme, Header, Metadata ve Checksum Doğrulama Modülü
  */
 
-// Dosya verisinin başına Metadata (İsim + MIME Tipi) ekler
+// Basit ve hızlı 8-bit Checksum hesabı
+function calculateChecksum(bytes) {
+    let sum = 0;
+    for (let i = 0; i < bytes.length; i++) {
+        sum = (sum + bytes[i]) & 0xFF;
+    }
+    return sum;
+}
+
+// Dosya verisinin başına Metadata (Dosya Adı + MIME Tipi) ekler
 export async function packFileWithMetadata(file) {
     const fileBuffer = await file.arrayBuffer();
     const metadata = {
@@ -17,11 +26,9 @@ export async function packFileWithMetadata(file) {
     // Yapı: [2 Bytes Metadata Boyutu] + [Metadata JSON Baytları] + [Orijinal Dosya Baytları]
     const combined = new Uint8Array(2 + metaLength + fileBuffer.byteLength);
     
-    // Metadata boyutunu 2 bayt olarak yaz (Max ~65KB metadata)
     combined[0] = (metaLength >> 8) & 0xFF;
     combined[1] = metaLength & 0xFF;
 
-    // Metadata ve Dosya içeriklerini kopyala
     combined.set(metaBytes, 2);
     combined.set(new Uint8Array(fileBuffer), 2 + metaLength);
 
@@ -36,7 +43,6 @@ export function unpackFileWithMetadata(combinedBuffer) {
 
     const metaLength = (combinedBuffer[0] << 8) | combinedBuffer[1];
     
-    // Hata kontrolü: Metadata uzunluğu mantıksızsa düz veri kabul et
     if (2 + metaLength > combinedBuffer.length) {
         return { fileName: "transfer_dosyasi", mimeType: "application/octet-stream", fileData: combinedBuffer };
     }
@@ -58,7 +64,8 @@ export function unpackFileWithMetadata(combinedBuffer) {
     }
 }
 
-export function chunkData(uint8Array, chunkSize = 60) {
+// Veriyi 135 baytlık paketlere böler ve sonuna Checksum ekler
+export function chunkData(uint8Array, chunkSize = 135) {
     const chunks = [];
     const totalChunks = Math.ceil(uint8Array.length / chunkSize);
     
@@ -67,24 +74,39 @@ export function chunkData(uint8Array, chunkSize = 60) {
         const end = Math.min(start + chunkSize, uint8Array.length);
         const chunkData = uint8Array.slice(start, end);
         
-        const packet = new Uint8Array(4 + chunkData.length);
+        // Header (4B) + Payload (135B) + Checksum (1B)
+        const packet = new Uint8Array(5 + chunkData.length);
         packet[0] = (i >> 8) & 0xFF;
         packet[1] = i & 0xFF;
         packet[2] = (totalChunks >> 8) & 0xFF;
         packet[3] = totalChunks & 0xFF;
         packet.set(chunkData, 4);
 
+        // Son bayta Checksum ekle
+        const payloadAndHeader = packet.slice(0, 4 + chunkData.length);
+        packet[4 + chunkData.length] = calculateChecksum(payloadAndHeader);
+
         chunks.push(packet);
     }
     return chunks;
 }
 
+// Paketi ayrıştırır ve Checksum kontrolünden geçirir
 export function parsePacket(packetBytes) {
-    if (packetBytes.length < 4) return null;
+    if (packetBytes.length < 6) return null; // Min geçerli paket boyutu
+
+    const checksumIndex = packetBytes.length - 1;
+    const receivedChecksum = packetBytes[checksumIndex];
+    const dataWithoutChecksum = packetBytes.slice(0, checksumIndex);
+
+    // Checksum tutmuyorsa paket parazitlidir -> Reddet
+    if (calculateChecksum(dataWithoutChecksum) !== receivedChecksum) {
+        return null; 
+    }
 
     const packetIndex = (packetBytes[0] << 8) | packetBytes[1];
     const totalPackets = (packetBytes[2] << 8) | packetBytes[3];
-    const payload = packetBytes.slice(4);
+    const payload = dataWithoutChecksum.slice(4);
 
     return { packetIndex, totalPackets, payload };
 }
