@@ -1,5 +1,5 @@
 /**
- * Kamera Taraması, Web Worker Entegrasyonu ve Donanım Yöneticisi
+ * Kamera Taraması, FPS Sınırlaması ve Gerçek Kamera Seçici
  */
 
 import { parsePacket } from './chunker.js';
@@ -12,8 +12,7 @@ export class MatrixDecoder {
         this.onProgress = onProgress;
         this.onComplete = onComplete;
         
-        this.gridSize = 24;
-
+        this.gridSize = 16;
         this.receivedPackets = new Map();
         this.totalPackets = 0;
         this.isScanning = false;
@@ -22,12 +21,16 @@ export class MatrixDecoder {
 
         this.torchState = false;
 
+        // Web Worker
         this.worker = new Worker('js/worker.js');
         this.isWorkerBusy = false;
         this.setupWorker();
 
+        // Metrikler ve FPS Throttle
         this.startTime = null;
         this.totalBytesReceived = 0;
+        this.lastScanTime = 0;
+        this.targetScanInterval = 1000 / 15; // Saniyede Maksimum 15 Tarama (60 FPS kilitlenmesini engeller)
     }
 
     setupWorker() {
@@ -46,16 +49,23 @@ export class MatrixDecoder {
     }
 
     async startCamera(deviceId = null) {
-        this.stopCamera();
+        this.stopCamera(); // Önceki yayını tamamen öldür
 
-        const constraints = {
-            video: deviceId 
-                ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 640 } }
-                : { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 640 } }
-        };
+        let constraints;
+        if (deviceId) {
+            constraints = { video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 640 } } };
+        } else {
+            constraints = { video: { facingMode: { exact: "environment" }, width: { ideal: 640 }, height: { ideal: 640 } } };
+        }
 
         try {
-            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            try {
+                this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (e) {
+                // Esnek fallback
+                this.stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            }
+
             this.video.srcObject = this.stream;
             await this.video.play();
 
@@ -65,6 +75,7 @@ export class MatrixDecoder {
             this.startTime = null;
             this.totalBytesReceived = 0;
             this.torchState = false;
+            this.lastScanTime = 0;
             
             this.scanLoop();
             return true;
@@ -105,29 +116,34 @@ export class MatrixDecoder {
         }
     }
 
-    scanLoop() {
+    scanLoop(now = 0) {
         if (!this.isScanning) return;
 
-        if (this.video.readyState === this.video.HAVE_ENOUGH_DATA && !this.isWorkerBusy) {
-            const width = this.video.videoWidth;
-            const height = this.video.videoHeight;
-            
-            this.canvas.width = width;
-            this.canvas.height = height;
-            this.ctx.drawImage(this.video, 0, 0, width, height);
+        // FPS Throttle: Ekran karıncalanmasını önlemek için 15 FPS sınırında tara
+        if (now - this.lastScanTime >= this.targetScanInterval) {
+            if (this.video.readyState === this.video.HAVE_ENOUGH_DATA && !this.isWorkerBusy) {
+                const width = this.video.videoWidth;
+                const height = this.video.videoHeight;
+                
+                this.canvas.width = width;
+                this.canvas.height = height;
+                this.ctx.drawImage(this.video, 0, 0, width, height);
 
-            const imgData = this.ctx.getImageData(0, 0, width, height);
-            
-            this.isWorkerBusy = true;
-            this.worker.postMessage({
-                imgData: imgData.data,
-                width: width,
-                height: height,
-                gridSize: this.gridSize
-            });
+                const imgData = this.ctx.getImageData(0, 0, width, height);
+                
+                this.isWorkerBusy = true;
+                this.lastScanTime = now;
+                
+                this.worker.postMessage({
+                    imgData: imgData.data,
+                    width: width,
+                    height: height,
+                    gridSize: this.gridSize
+                });
+            }
         }
 
-        this.animFrameId = requestAnimationFrame(() => this.scanLoop());
+        this.animFrameId = requestAnimationFrame((timestamp) => this.scanLoop(timestamp));
     }
 
     handleParsedBits(bitString) {

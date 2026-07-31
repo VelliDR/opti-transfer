@@ -266,19 +266,23 @@ input:checked + .slider:before {
     text-overflow: ellipsis;
 }
 
-/* Dinamik Matris ve Kamera Görselleştirici (1:1 Square Aspect Ratio) */
+/* Cam / Frosted Glass Görselleştirici Çerçevesi */
 .visualizer-container {
-    background: #000;
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: var(--m3-radius-medium);
     overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
     width: 100%;
-    aspect-ratio: 1 / 1; /* Hangi telefonda olursa olsun kusursuz kare tutar */
+    aspect-ratio: 1 / 1;
     max-height: 360px;
     margin: 0 auto;
-    border: 1px solid var(--m3-sys-color-surface-container);
+    padding: 12px; /* Matrisin köşelerinin kesilmesini önleyen şeffaf koruma alanı */
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
 /* Keskin Pikseller (OLED / High-DPI ekranlarda netleştirme) */

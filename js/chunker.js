@@ -56,7 +56,8 @@ export function unpackFileWithMetadata(combinedBuffer) {
     }
 }
 
-export function chunkData(uint8Array, chunkSize = 137) {
+// Siyah-Beyaz 16x16 Matris İçin Optimum Payload = 25 Bayt
+export function chunkData(uint8Array, chunkSize = 25) {
     const chunks = [];
     const totalChunks = Math.ceil(uint8Array.length / chunkSize);
     

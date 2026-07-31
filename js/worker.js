@@ -1,23 +1,19 @@
 /**
- * Web Worker - Arka Plan Görüntü İşleme & Geometrik Köşe Çözücü
+ * Web Worker - Siyah/Beyaz İkili Görüntü İşleyici
  */
 
-function classifyColor(r, g, b) {
-    if (r < 80 && g < 80 && b < 80) return '00';
-    if (r > 140 && g > 140 && b > 140) return '01';
-    if (r > g + 30 && r > b + 30) return '10';
-    if (b > r + 30 && b > g + 30) return '11';
-    return '00';
+function classifyBW(r, g, b) {
+    // Parlaklık Formülü (Luminance)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+    return luminance > 120 ? '1' : '0';
 }
 
-// Geometrik Koordinat Kısıtlı Köşe Tespiti
 function findCornerPoints(width, height, data) {
     const step = 4;
-    
-    let minTL = Infinity, tl = null; // Sol-Üst (Min x + y)
-    let maxTR = -Infinity, tr = null; // Sağ-Üst (Max x - y)
-    let minBL = Infinity, bl = null; // Sol-Alt (Min x - y)
-    let maxBR = -Infinity, br = null; // Sağ-Alt (Max x + y)
+    let minTL = Infinity, tl = null;
+    let maxTR = -Infinity, tr = null;
+    let minBL = Infinity, bl = null;
+    let maxBR = -Infinity, br = null;
 
     for (let y = 0; y < height; y += step) {
         for (let x = 0; x < width; x += step) {
@@ -25,26 +21,23 @@ function findCornerPoints(width, height, data) {
             const r = data[idx];
             const g = data[idx + 1];
             const b = data[idx + 2];
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
 
-            // 1. Kırmızı Nokta (Sol-Üst): Ekranın en sol-üstteki kırmızı pikseli
-            if (r > g + 40 && r > b + 40) {
-                const score = x + y;
-                if (score < minTL) { minTL = score; tl = { x, y }; }
+            // Parlak (Beyaz) Noktalar
+            if (lum > 150) {
+                const scoreTL = x + y;
+                if (scoreTL < minTL) { minTL = scoreTL; tl = { x, y }; }
+
+                const scoreTR = x - y;
+                if (scoreTR > maxTR) { maxTR = scoreTR; tr = { x, y }; }
+
+                const scoreBL = x - y;
+                if (scoreBL < minBL) { minBL = scoreBL; bl = { x, y }; }
             }
-            // 2. Yeşil Nokta (Sağ-Üst): Ekranın en sağ-üstteki yeşil pikseli
-            if (g > r + 40 && g > b + 40) {
-                const score = x - y;
-                if (score > maxTR) { maxTR = score; tr = { x, y }; }
-            }
-            // 3. Mavi Nokta (Sol-Alt): Ekranın en sol-altındaki mavi pikseli
-            if (b > r + 40 && b > g + 40) {
-                const score = x - y;
-                if (score < minBL) { minBL = score; bl = { x, y }; }
-            }
-            // 4. Beyaz Nokta (Sağ-Alt): Ekranın en sağ-altındaki beyaz pikseli
-            if (r > 150 && g > 150 && b > 150) {
-                const score = x + y;
-                if (score > maxBR) { maxBR = score; br = { x, y }; }
+            // Koyu (Siyah) Sağ-Alt Nokta
+            if (lum < 60) {
+                const scoreBR = x + y;
+                if (scoreBR > maxBR) { maxBR = scoreBR; br = { x, y }; }
             }
         }
     }
@@ -74,6 +67,7 @@ self.onmessage = function (e) {
 
     for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
+            // Köşeleri Atla
             if ((row === 0 && col === 0) || 
                 (row === 0 && col === gridSize - 1) || 
                 (row === gridSize - 1 && col === 0) || 
@@ -100,9 +94,9 @@ self.onmessage = function (e) {
                 const r = imgData[idx];
                 const g = imgData[idx + 1];
                 const b = imgData[idx + 2];
-                bitString += classifyColor(r, g, b);
+                bitString += classifyBW(r, g, b);
             } else {
-                bitString += '00';
+                bitString += '0';
             }
         }
     }
