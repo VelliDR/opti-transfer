@@ -1,5 +1,5 @@
 /**
- * Kamera Taraması, Web Worker Entegrasyonu, Gürültü Filtresi ve Donanım Kontrol Modülü
+ * Kamera Taraması, Web Worker Entegrasyonu ve Donanım Yöneticisi
  */
 
 import { parsePacket } from './chunker.js';
@@ -12,7 +12,7 @@ export class MatrixDecoder {
         this.onProgress = onProgress;
         this.onComplete = onComplete;
         
-        this.gridSize = 24; // 24x24 Yüksek Hızlı Matris
+        this.gridSize = 24;
 
         this.receivedPackets = new Map();
         this.totalPackets = 0;
@@ -20,15 +20,12 @@ export class MatrixDecoder {
         this.stream = null;
         this.animFrameId = null;
 
-        // Donanım Durumu
         this.torchState = false;
 
-        // Worker Kurulumu
         this.worker = new Worker('js/worker.js');
         this.isWorkerBusy = false;
         this.setupWorker();
 
-        // Metrikler
         this.startTime = null;
         this.totalBytesReceived = 0;
     }
@@ -121,7 +118,6 @@ export class MatrixDecoder {
 
             const imgData = this.ctx.getImageData(0, 0, width, height);
             
-            // Veriyi arka plan işleyicisine (Worker) gönder
             this.isWorkerBusy = true;
             this.worker.postMessage({
                 imgData: imgData.data,
@@ -146,17 +142,12 @@ export class MatrixDecoder {
         const parsed = parsePacket(new Uint8Array(bytes));
         
         if (parsed) {
-            // GÜRLÜTÜ VE HATALI HEADER FİLTRESİ:
-            // 1. Paket sayısı aşırı yüksekse (30.000 gibi bozuk başlıklar) reddet.
             if (parsed.totalPackets <= 0 || parsed.totalPackets > 10000) return;
-            // 2. Paket indeksi toplam paket sayısından büyük veya eşitse reddet.
             if (parsed.packetIndex >= parsed.totalPackets) return;
 
-            // Toplam paket sayısını ilk geçerli karede sabitle
             if (this.totalPackets === 0) {
                 this.totalPackets = parsed.totalPackets;
             } else if (parsed.totalPackets !== this.totalPackets) {
-                // Önceden sabitlenen toplam sayı ile uyuşmayan parazitli paketleri at
                 return;
             }
 
@@ -181,7 +172,6 @@ export class MatrixDecoder {
                     });
                 }
 
-                // İletim tamamlandı mı?
                 if (this.receivedPackets.size === this.totalPackets) {
                     this.isScanning = false;
                     const completeBuffer = this.assemblePackets();

@@ -56,7 +56,6 @@ export function unpackFileWithMetadata(combinedBuffer) {
     }
 }
 
-// 24x24 Matris için Optimum chunkSize = 137 Bayt
 export function chunkData(uint8Array, chunkSize = 137) {
     const chunks = [];
     const totalChunks = Math.ceil(uint8Array.length / chunkSize);
@@ -67,7 +66,6 @@ export function chunkData(uint8Array, chunkSize = 137) {
         const chunkData = uint8Array.slice(start, end);
         const payloadLen = chunkData.length;
         
-        // Header (5B) + Payload + Checksum (1B)
         const packet = new Uint8Array(5 + payloadLen + 1);
         packet[0] = (i >> 8) & 0xFF;
         packet[1] = i & 0xFF;
@@ -76,7 +74,6 @@ export function chunkData(uint8Array, chunkSize = 137) {
         packet[4] = payloadLen & 0xFF;
         packet.set(chunkData, 5);
 
-        // Checksum Hesabı
         const dataToHash = packet.slice(0, 5 + payloadLen);
         packet[5 + payloadLen] = calculateChecksum(dataToHash);
 
@@ -86,13 +83,12 @@ export function chunkData(uint8Array, chunkSize = 137) {
 }
 
 export function parsePacket(packetBytes) {
-    if (packetBytes.length < 7) return null; // Min geçerli paket boyutu
+    if (packetBytes.length < 7) return null;
 
     const packetIndex = (packetBytes[0] << 8) | packetBytes[1];
     const totalPackets = (packetBytes[2] << 8) | packetBytes[3];
     const payloadLen = packetBytes[4];
 
-    // Boyut mantıksızsa reddet
     if (payloadLen === 0 || 5 + payloadLen + 1 > packetBytes.length) {
         return null;
     }
@@ -101,12 +97,10 @@ export function parsePacket(packetBytes) {
     const receivedChecksum = packetBytes[checksumIndex];
     const dataToHash = packetBytes.slice(0, checksumIndex);
 
-    // Checksum Tutmuyorsa Görsel Gürültüdür -> PAKETİ ÇÖPE AT
     if (calculateChecksum(dataToHash) !== receivedChecksum) {
         return null; 
     }
 
     const payload = packetBytes.slice(5, 5 + payloadLen);
-
     return { packetIndex, totalPackets, payload };
 }

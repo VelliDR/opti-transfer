@@ -1,5 +1,5 @@
 /**
- * Web Worker - Arka Plan Görüntü İşleme & Renk Çözücü
+ * Web Worker - Arka Plan Görüntü İşleme & Geometrik Köşe Çözücü
  */
 
 function classifyColor(r, g, b) {
@@ -10,12 +10,14 @@ function classifyColor(r, g, b) {
     return '00';
 }
 
+// Geometrik Koordinat Kısıtlı Köşe Tespiti
 function findCornerPoints(width, height, data) {
     const step = 4;
-    let maxRed = -Infinity, tl = null;
-    let maxGreen = -Infinity, tr = null;
-    let maxBlue = -Infinity, bl = null;
-    let maxWhite = -Infinity, br = null;
+    
+    let minTL = Infinity, tl = null; // Sol-Üst (Min x + y)
+    let maxTR = -Infinity, tr = null; // Sağ-Üst (Max x - y)
+    let minBL = Infinity, bl = null; // Sol-Alt (Min x - y)
+    let maxBR = -Infinity, br = null; // Sağ-Alt (Max x + y)
 
     for (let y = 0; y < height; y += step) {
         for (let x = 0; x < width; x += step) {
@@ -24,19 +26,30 @@ function findCornerPoints(width, height, data) {
             const g = data[idx + 1];
             const b = data[idx + 2];
 
-            const redScore = r - (g + b) / 2;
-            const greenScore = g - (r + b) / 2;
-            const blueScore = b - (r + g) / 2;
-            const whiteScore = r + g + b;
-
-            if (redScore > maxRed) { maxRed = redScore; tl = { x, y }; }
-            if (greenScore > maxGreen) { maxGreen = greenScore; tr = { x, y }; }
-            if (blueScore > maxBlue) { maxBlue = blueScore; bl = { x, y }; }
-            if (whiteScore > maxWhite) { maxWhite = whiteScore; br = { x, y }; }
+            // 1. Kırmızı Nokta (Sol-Üst): Ekranın en sol-üstteki kırmızı pikseli
+            if (r > g + 40 && r > b + 40) {
+                const score = x + y;
+                if (score < minTL) { minTL = score; tl = { x, y }; }
+            }
+            // 2. Yeşil Nokta (Sağ-Üst): Ekranın en sağ-üstteki yeşil pikseli
+            if (g > r + 40 && g > b + 40) {
+                const score = x - y;
+                if (score > maxTR) { maxTR = score; tr = { x, y }; }
+            }
+            // 3. Mavi Nokta (Sol-Alt): Ekranın en sol-altındaki mavi pikseli
+            if (b > r + 40 && b > g + 40) {
+                const score = x - y;
+                if (score < minBL) { minBL = score; bl = { x, y }; }
+            }
+            // 4. Beyaz Nokta (Sağ-Alt): Ekranın en sağ-altındaki beyaz pikseli
+            if (r > 150 && g > 150 && b > 150) {
+                const score = x + y;
+                if (score > maxBR) { maxBR = score; br = { x, y }; }
+            }
         }
     }
 
-    if (maxRed < 30 || maxGreen < 30 || maxBlue < 30) return null;
+    if (!tl || !tr || !bl || !br) return null;
     return { tl, tr, bl, br };
 }
 
