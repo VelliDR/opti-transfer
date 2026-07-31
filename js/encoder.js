@@ -1,7 +1,3 @@
-/**
- * Canvas Üzerinde Renkli Matris Oluşturucu Modülü
- */
-
 export const COLOR_MAP = {
     '00': '#000000', // Siyah
     '01': '#FFFFFF', // Beyaz
@@ -10,14 +6,14 @@ export const COLOR_MAP = {
 };
 
 export class MatrixEncoder {
-    constructor(canvas, gridSize = 24) { // 16 yerine 24 yapıldı
+    constructor(canvas, gridSize = 24) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.gridSize = gridSize;
         this.timerId = null;
         this.currentFrame = 0;
         this.packets = [];
-        this.fps = 20; // Varsayılan FPS'i 20 yaptık
+        this.fps = 20;
     }
 
     setPackets(packets) {
@@ -48,25 +44,21 @@ export class MatrixEncoder {
 
         for (let row = 0; row < this.gridSize; row++) {
             for (let col = 0; col < this.gridSize; col++) {
-                
-                // 1. Köşe Kalibrasyon Blokları (Kamera oryantasyonu ve renk tanılama)
                 if (row === 0 && col === 0) {
-                    this.ctx.fillStyle = '#FF0000'; // Sol Üst: Kırmızı
+                    this.ctx.fillStyle = '#FF0000';
                 } else if (row === 0 && col === this.gridSize - 1) {
-                    this.ctx.fillStyle = '#00FF00'; // Sağ Üst: Yeşil
+                    this.ctx.fillStyle = '#00FF00';
                 } else if (row === this.gridSize - 1 && col === 0) {
-                    this.ctx.fillStyle = '#0000FF'; // Sol Alt: Mavi
+                    this.ctx.fillStyle = '#0000FF';
                 } else if (row === this.gridSize - 1 && col === this.gridSize - 1) {
-                    this.ctx.fillStyle = '#FFFFFF'; // Sağ Alt: Beyaz
-                } 
-                // 2. Veri Hücreleri
-                else {
+                    this.ctx.fillStyle = '#FFFFFF';
+                } else {
                     if (bitIndex < bitString.length - 1) {
                         const twoBits = bitString.substr(bitIndex, 2);
                         this.ctx.fillStyle = COLOR_MAP[twoBits] || '#000000';
                         bitIndex += 2;
                     } else {
-                        this.ctx.fillStyle = '#000000'; // Dolgu (Padding)
+                        this.ctx.fillStyle = '#000000'; // Siyah Dolgu
                     }
                 }
 

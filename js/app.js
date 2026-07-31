@@ -115,7 +115,7 @@ btnTabReceiver.addEventListener('click', () => {
             const encryptedBytes = await encryptData(packedBuffer, password);
             
             // 3. Matris Paketlerine Böl
-            const packets = chunkData(encryptedBytes, 135);
+            const packets = chunkData(encryptedBytes);
 
             statSendTotalPackets.textContent = packets.length;
 
