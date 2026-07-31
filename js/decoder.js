@@ -1,5 +1,5 @@
 /**
- * Kamera Taraması, Web Worker Entegrasyonu ve Donanım Yöneticisi
+ * Kamera Taraması ve Renk Algılama Çözücü Modülü
  */
 
 import { parsePacket } from './chunker.js';
@@ -13,49 +13,22 @@ export class MatrixDecoder {
         this.onComplete = onComplete;
         
         this.gridSize = 16;
-
         this.receivedPackets = new Map();
         this.totalPackets = 0;
         this.isScanning = false;
         this.stream = null;
         this.animFrameId = null;
 
-        this.torchState = false;
-
-        this.worker = new Worker('js/worker.js');
-        this.isWorkerBusy = false;
-        this.setupWorker();
-
+        // Metrik Zamanlayıcıları
         this.startTime = null;
         this.totalBytesReceived = 0;
     }
 
-    setupWorker() {
-        this.worker.onmessage = (e) => {
-            const { bitString } = e.data;
-            this.isWorkerBusy = false;
-            if (bitString) {
-                this.handleParsedBits(bitString);
-            }
-        };
-    }
-
-    async getCameraDevices() {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        return devices.filter(device => device.kind === 'videoinput');
-    }
-
-    async startCamera(deviceId = null) {
-        this.stopCamera();
-
-        const constraints = {
-            video: deviceId 
-                ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 640 } }
-                : { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 640 } }
-        };
-
+    async startCamera() {
         try {
-            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            this.stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 640 } }
+            });
             this.video.srcObject = this.stream;
             await this.video.play();
 
@@ -64,34 +37,11 @@ export class MatrixDecoder {
             this.totalPackets = 0;
             this.startTime = null;
             this.totalBytesReceived = 0;
-            this.torchState = false;
             
             this.scanLoop();
             return true;
         } catch (err) {
-            console.error("Kamera başlatma hatası:", err);
-            return false;
-        }
-    }
-
-    async toggleTorch() {
-        if (!this.stream) return false;
-        const track = this.stream.getVideoTracks()[0];
-        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-
-        if (!capabilities.torch) {
-            alert("Bu cihazda veya kamerada flaş desteği bulunmuyor!");
-            return false;
-        }
-
-        try {
-            this.torchState = !this.torchState;
-            await track.applyConstraints({
-                advanced: [{ torch: this.torchState }]
-            });
-            return this.torchState;
-        } catch (err) {
-            console.error("Flaş değiştirilemedi:", err);
+            console.error("Kamera açma hatası:", err);
             return false;
         }
     }
@@ -105,32 +55,53 @@ export class MatrixDecoder {
         }
     }
 
+    classifyColor(r, g, b) {
+        if (r < 80 && g < 80 && b < 80) return '00';
+        if (r > 140 && g > 140 && b > 140) return '01';
+        if (r > g + 30 && r > b + 30) return '10';
+        if (b > r + 30 && b > g + 30) return '11';
+        return '00';
+    }
+
     scanLoop() {
         if (!this.isScanning) return;
 
-        if (this.video.readyState === this.video.HAVE_ENOUGH_DATA && !this.isWorkerBusy) {
+        if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
             const width = this.video.videoWidth;
             const height = this.video.videoHeight;
             
             this.canvas.width = width;
             this.canvas.height = height;
             this.ctx.drawImage(this.video, 0, 0, width, height);
-
-            const imgData = this.ctx.getImageData(0, 0, width, height);
             
-            this.isWorkerBusy = true;
-            this.worker.postMessage({
-                imgData: imgData.data,
-                width: width,
-                height: height,
-                gridSize: this.gridSize
-            });
+            this.processFrame(width, height);
         }
 
         this.animFrameId = requestAnimationFrame(() => this.scanLoop());
     }
 
-    handleParsedBits(bitString) {
+    processFrame(width, height) {
+        const cellSizeX = width / this.gridSize;
+        const cellSizeY = height / this.gridSize;
+        let bitString = "";
+
+        for (let row = 0; row < this.gridSize; row++) {
+            for (let col = 0; col < this.gridSize; col++) {
+                if ((row === 0 && col === 0) || 
+                    (row === 0 && col === this.gridSize - 1) || 
+                    (row === this.gridSize - 1 && col === 0) || 
+                    (row === this.gridSize - 1 && col === this.gridSize - 1)) {
+                    continue;
+                }
+
+                const centerX = Math.floor(col * cellSizeX + cellSizeX / 2);
+                const centerY = Math.floor(row * cellSizeY + cellSizeY / 2);
+
+                const pixel = this.ctx.getImageData(centerX, centerY, 1, 1).data;
+                bitString += this.classifyColor(pixel[0], pixel[1], pixel[2]);
+            }
+        }
+
         const bytes = [];
         for (let i = 0; i < bitString.length; i += 8) {
             const byteStr = bitString.substr(i, 8);
@@ -140,23 +111,19 @@ export class MatrixDecoder {
         }
 
         const parsed = parsePacket(new Uint8Array(bytes));
-        
-        if (parsed) {
-            if (parsed.totalPackets <= 0 || parsed.totalPackets > 10000) return;
-            if (parsed.packetIndex >= parsed.totalPackets) return;
+        if (parsed && parsed.totalPackets > 0 && parsed.packetIndex < parsed.totalPackets) {
+            
+            if (!this.startTime) this.startTime = performance.now();
 
             if (this.totalPackets === 0) {
                 this.totalPackets = parsed.totalPackets;
-            } else if (parsed.totalPackets !== this.totalPackets) {
-                return;
             }
-
-            if (!this.startTime) this.startTime = performance.now();
 
             if (!this.receivedPackets.has(parsed.packetIndex)) {
                 this.receivedPackets.set(parsed.packetIndex, parsed.payload);
                 this.totalBytesReceived += parsed.payload.length;
                 
+                // Hız ve Zaman Hesaplama
                 const elapsedTimeSec = (performance.now() - this.startTime) / 1000;
                 const speedKBps = elapsedTimeSec > 0 ? (this.totalBytesReceived / 1024) / elapsedTimeSec : 0;
                 const progress = Math.floor((this.receivedPackets.size / this.totalPackets) * 100);

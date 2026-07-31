@@ -1,4 +1,4 @@
-/* --- Material 3 Dark Theme & Responsive Variables --- */
+/* --- Material 3 Dark Theme Variables --- */
 :root {
     --m3-sys-color-background: #141218;
     --m3-sys-color-surface: #211f26;
@@ -22,29 +22,21 @@
     font-family: 'Roboto', system-ui, -apple-system, sans-serif;
 }
 
-/* Mobil Adres Çubuğu Taşmalarını Engelleyen Akıcı Gövde */
-html, body {
-    width: 100%;
-    min-height: 100vh;
-    min-height: 100dvh; /* Dinamik mobil ekran yüksekliği */
+body {
     background-color: var(--m3-sys-color-background);
     color: var(--m3-sys-color-on-surface);
-}
-
-body {
     display: flex;
     justify-content: center;
-    align-items: flex-start;
-    padding: 12px;
+    min-height: 100vh;
+    padding: 16px;
 }
 
 .app-container {
     width: 100%;
-    max-width: 480px; /* Tablet ve masaüstünde derli toplu kalır */
+    max-width: 480px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    margin: 0 auto;
+    gap: 20px;
 }
 
 /* Header & Segmented Button */
@@ -53,15 +45,15 @@ body {
 }
 
 .app-title {
-    font-size: clamp(1.4rem, 5vw, 1.8rem); /* Ekran genişliğine göre esnek başlık */
+    font-size: 1.8rem;
     font-weight: 700;
     color: var(--m3-sys-color-primary);
 }
 
 .app-subtitle {
-    font-size: clamp(0.75rem, 3vw, 0.9rem);
+    font-size: 0.9rem;
     color: var(--m3-sys-color-on-surface-variant);
-    margin-bottom: 12px;
+    margin-bottom: 16px;
 }
 
 .m3-segmented-button {
@@ -89,29 +81,29 @@ body {
     color: var(--m3-sys-color-on-primary-container);
 }
 
-/* Kartlar ve Paneller */
+/* Cards & Panels */
 .m3-card {
     background: var(--m3-sys-color-surface);
     border-radius: var(--m3-radius-medium);
-    padding: 16px;
+    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    gap: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 
 .panel-title {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     color: var(--m3-sys-color-on-surface);
 }
 
-/* Switch Bileşeni */
+/* Switch Component */
 .m3-switch-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
     background: var(--m3-sys-color-surface-container);
-    padding: 10px 14px;
+    padding: 12px 16px;
     border-radius: var(--m3-radius-medium);
 }
 
@@ -121,21 +113,20 @@ body {
 }
 
 .switch-label span {
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     font-weight: 500;
 }
 
 .switch-label small {
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     color: var(--m3-sys-color-on-surface-variant);
 }
 
 .m3-switch {
     position: relative;
     display: inline-block;
-    width: 46px;
-    height: 24px;
-    flex-shrink: 0;
+    width: 48px;
+    height: 26px;
 }
 
 .m3-switch input { opacity: 0; width: 0; height: 0; }
@@ -146,14 +137,14 @@ body {
     top: 0; left: 0; right: 0; bottom: 0;
     background-color: var(--m3-sys-color-outline);
     transition: .3s;
-    border-radius: 24px;
+    border-radius: 26px;
 }
 
 .slider:before {
     position: absolute;
     content: "";
-    height: 16px;
-    width: 16px;
+    height: 18px;
+    width: 18px;
     left: 4px;
     bottom: 4px;
     background-color: var(--m3-sys-color-surface);
@@ -170,7 +161,7 @@ input:checked + .slider:before {
     background-color: var(--m3-sys-color-on-primary);
 }
 
-/* Form Elemanları ve Butonlar */
+/* Inputs & Buttons */
 .m3-input-group {
     display: flex;
     flex-direction: column;
@@ -178,7 +169,7 @@ input:checked + .slider:before {
 }
 
 .input-label {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     color: var(--m3-sys-color-on-surface-variant);
 }
 
@@ -186,33 +177,24 @@ input:checked + .slider:before {
     background: var(--m3-sys-color-surface-container);
     border: 1px solid var(--m3-sys-color-outline);
     color: var(--m3-sys-color-on-surface);
-    padding: 10px 12px;
+    padding: 12px;
     border-radius: var(--m3-radius-small);
-    font-size: 0.9rem;
-    width: 100%;
+    font-size: 0.95rem;
 }
 
 .m3-button-row {
     display: flex;
-    gap: 8px;
-    flex-wrap: wrap; /* Dar ekranlarda butonların taşmasını önler */
+    gap: 12px;
 }
 
 .m3-btn {
     flex: 1;
-    min-width: 90px;
-    padding: 10px 14px;
+    padding: 12px;
     border-radius: var(--m3-radius-large);
-    font-size: 0.85rem;
     font-weight: 500;
     cursor: pointer;
     border: none;
-    transition: filter 0.2s ease, transform 0.1s ease;
-    text-align: center;
-}
-
-.m3-btn:active {
-    transform: scale(0.98);
+    transition: filter 0.2s ease;
 }
 
 .m3-btn-primary {
@@ -231,21 +213,20 @@ input:checked + .slider:before {
     cursor: not-allowed;
 }
 
-/* İstatistik Izgarası (Grid) */
+/* Stats Cards Grid */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: 10px;
 }
 
 .stat-card {
     background: var(--m3-sys-color-surface-container);
-    padding: 8px 12px;
+    padding: 10px 14px;
     border-radius: var(--m3-radius-small);
     display: flex;
     flex-direction: column;
     gap: 2px;
-    overflow: hidden;
 }
 
 .stat-card.highlight {
@@ -253,48 +234,32 @@ input:checked + .slider:before {
 }
 
 .stat-label {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--m3-sys-color-on-surface-variant);
 }
 
 .stat-value {
-    font-size: 0.88rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: var(--m3-sys-color-on-surface);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-/* Cam / Frosted Glass Görselleştirici Çerçevesi */
+/* Visualizer Container & Progress */
 .visualizer-container {
-    background: rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: #000;
     border-radius: var(--m3-radius-medium);
     overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    max-height: 360px;
-    margin: 0 auto;
-    padding: 12px; /* Matrisin köşelerinin kesilmesini önleyen şeffaf koruma alanı */
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    min-height: 260px;
 }
 
-/* Keskin Pikseller (OLED / High-DPI ekranlarda netleştirme) */
 canvas, video {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
+    max-width: 100%;
+    height: auto;
 }
 
-/* İlerleme Çubuğu ve Durum */
 .m3-progress-container {
     height: 6px;
     background: var(--m3-sys-color-surface-container);
@@ -310,16 +275,14 @@ canvas, video {
 }
 
 .m3-status-bar {
-    font-size: 0.82rem;
+    font-size: 0.85rem;
     color: var(--m3-sys-color-on-surface-variant);
     text-align: center;
-    word-break: break-word;
 }
 
 .slider-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
 }
 
 .m3-badge {
@@ -327,12 +290,5 @@ canvas, video {
     color: var(--m3-sys-color-on-primary-container);
     padding: 2px 8px;
     border-radius: 10px;
-    font-size: 0.72rem;
-}
-
-/* Çok Küçük Ekranlar (Örn: iPhone SE / 360px altı) İçin İnce Ayar */
-@media (max-width: 360px) {
-    body { padding: 8px; }
-    .m3-card { padding: 12px; gap: 10px; }
-    .stats-grid { grid-template-columns: 1fr; } /* Tek sütuna düşür */
+    font-size: 0.75rem;
 }

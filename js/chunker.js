@@ -1,15 +1,8 @@
 /**
- * Paket Bölme, Header, Metadata ve Checksum Doğrulama Modülü
+ * Paket Bölme, Başlık (Header) ve Metadata Yönetim Modülü
  */
 
-function calculateChecksum(bytes) {
-    let sum = 0;
-    for (let i = 0; i < bytes.length; i++) {
-        sum = (sum + bytes[i]) & 0xFF;
-    }
-    return sum;
-}
-
+// Dosya verisinin başına Metadata (İsim + MIME Tipi) ekler
 export async function packFileWithMetadata(file) {
     const fileBuffer = await file.arrayBuffer();
     const metadata = {
@@ -21,21 +14,29 @@ export async function packFileWithMetadata(file) {
     const metaBytes = encoder.encode(JSON.stringify(metadata));
     const metaLength = metaBytes.length;
 
+    // Yapı: [2 Bytes Metadata Boyutu] + [Metadata JSON Baytları] + [Orijinal Dosya Baytları]
     const combined = new Uint8Array(2 + metaLength + fileBuffer.byteLength);
+    
+    // Metadata boyutunu 2 bayt olarak yaz (Max ~65KB metadata)
     combined[0] = (metaLength >> 8) & 0xFF;
     combined[1] = metaLength & 0xFF;
+
+    // Metadata ve Dosya içeriklerini kopyala
     combined.set(metaBytes, 2);
     combined.set(new Uint8Array(fileBuffer), 2 + metaLength);
 
     return combined;
 }
 
+// Şifresi çözülen veriden Metadata'yı ve Orijinal Dosya Baytlarını ayırır
 export function unpackFileWithMetadata(combinedBuffer) {
     if (combinedBuffer.length < 2) {
         return { fileName: "transfer_dosyasi", mimeType: "application/octet-stream", fileData: combinedBuffer };
     }
 
     const metaLength = (combinedBuffer[0] << 8) | combinedBuffer[1];
+    
+    // Hata kontrolü: Metadata uzunluğu mantıksızsa düz veri kabul et
     if (2 + metaLength > combinedBuffer.length) {
         return { fileName: "transfer_dosyasi", mimeType: "application/octet-stream", fileData: combinedBuffer };
     }
@@ -52,12 +53,12 @@ export function unpackFileWithMetadata(combinedBuffer) {
             fileData: fileData
         };
     } catch (err) {
+        console.warn("Metadata okunamadı, varsayılan isim kullanılıyor:", err);
         return { fileName: "transfer_dosyasi", mimeType: "application/octet-stream", fileData: combinedBuffer };
     }
 }
 
-// 16x16 Renkli Matris İçin Tam Uyumlu Payload = 57 Bayt
-export function chunkData(uint8Array, chunkSize = 57) {
+export function chunkData(uint8Array, chunkSize = 60) {
     const chunks = [];
     const totalChunks = Math.ceil(uint8Array.length / chunkSize);
     
@@ -65,19 +66,13 @@ export function chunkData(uint8Array, chunkSize = 57) {
         const start = i * chunkSize;
         const end = Math.min(start + chunkSize, uint8Array.length);
         const chunkData = uint8Array.slice(start, end);
-        const payloadLen = chunkData.length;
         
-        // 5B Header + Payload + 1B Checksum = Max 63 Bayt
-        const packet = new Uint8Array(5 + payloadLen + 1);
+        const packet = new Uint8Array(4 + chunkData.length);
         packet[0] = (i >> 8) & 0xFF;
         packet[1] = i & 0xFF;
         packet[2] = (totalChunks >> 8) & 0xFF;
         packet[3] = totalChunks & 0xFF;
-        packet[4] = payloadLen & 0xFF;
-        packet.set(chunkData, 5);
-
-        const dataToHash = packet.slice(0, 5 + payloadLen);
-        packet[5 + payloadLen] = calculateChecksum(dataToHash);
+        packet.set(chunkData, 4);
 
         chunks.push(packet);
     }
@@ -85,24 +80,11 @@ export function chunkData(uint8Array, chunkSize = 57) {
 }
 
 export function parsePacket(packetBytes) {
-    if (packetBytes.length < 7) return null;
+    if (packetBytes.length < 4) return null;
 
     const packetIndex = (packetBytes[0] << 8) | packetBytes[1];
     const totalPackets = (packetBytes[2] << 8) | packetBytes[3];
-    const payloadLen = packetBytes[4];
+    const payload = packetBytes.slice(4);
 
-    if (payloadLen === 0 || 5 + payloadLen + 1 > packetBytes.length) {
-        return null;
-    }
-
-    const checksumIndex = 5 + payloadLen;
-    const receivedChecksum = packetBytes[checksumIndex];
-    const dataToHash = packetBytes.slice(0, checksumIndex);
-
-    if (calculateChecksum(dataToHash) !== receivedChecksum) {
-        return null; 
-    }
-
-    const payload = packetBytes.slice(5, 5 + payloadLen);
     return { packetIndex, totalPackets, payload };
 }
