@@ -1,19 +1,24 @@
 /**
- * Web Worker - Siyah/Beyaz İkili Görüntü İşleyici
+ * Web Worker - Akıllı Kadranlı Renkli Matris İşleyici
  */
 
-function classifyBW(r, g, b) {
-    // Parlaklık Formülü (Luminance)
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
-    return luminance > 120 ? '1' : '0';
+function classifyColor(r, g, b) {
+    if (r < 80 && g < 80 && b < 80) return '00';
+    if (r > 130 && g > 130 && b > 130) return '01';
+    if (r > g + 30 && r > b + 30) return '10';
+    if (b > r + 30 && b > g + 30) return '11';
+    return '00';
 }
 
 function findCornerPoints(width, height, data) {
     const step = 4;
-    let minTL = Infinity, tl = null;
-    let maxTR = -Infinity, tr = null;
-    let minBL = Infinity, bl = null;
-    let maxBR = -Infinity, br = null;
+    const halfW = width / 2;
+    const halfH = height / 2;
+
+    let maxRed = -Infinity, tl = null;
+    let maxGreen = -Infinity, tr = null;
+    let maxBlue = -Infinity, bl = null;
+    let maxWhite = -Infinity, br = null;
 
     for (let y = 0; y < height; y += step) {
         for (let x = 0; x < width; x += step) {
@@ -21,28 +26,31 @@ function findCornerPoints(width, height, data) {
             const r = data[idx];
             const g = data[idx + 1];
             const b = data[idx + 2];
-            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
 
-            // Parlak (Beyaz) Noktalar
-            if (lum > 150) {
-                const scoreTL = x + y;
-                if (scoreTL < minTL) { minTL = scoreTL; tl = { x, y }; }
-
-                const scoreTR = x - y;
-                if (scoreTR > maxTR) { maxTR = scoreTR; tr = { x, y }; }
-
-                const scoreBL = x - y;
-                if (scoreBL < minBL) { minBL = scoreBL; bl = { x, y }; }
+            // 1. Sol-Üst Kadran (Sadece Kırmızı Ara)
+            if (x < halfW && y < halfH) {
+                const redScore = r - (g + b) / 2;
+                if (redScore > maxRed) { maxRed = redScore; tl = { x, y }; }
             }
-            // Koyu (Siyah) Sağ-Alt Nokta
-            if (lum < 60) {
-                const scoreBR = x + y;
-                if (scoreBR > maxBR) { maxBR = scoreBR; br = { x, y }; }
+            // 2. Sağ-Üst Kadran (Sadece Yeşil Ara)
+            else if (x >= halfW && y < halfH) {
+                const greenScore = g - (r + b) / 2;
+                if (greenScore > maxGreen) { maxGreen = greenScore; tr = { x, y }; }
+            }
+            // 3. Sol-Alt Kadran (Sadece Mavi Ara)
+            else if (x < halfW && y >= halfH) {
+                const blueScore = b - (r + g) / 2;
+                if (blueScore > maxBlue) { maxBlue = blueScore; bl = { x, y }; }
+            }
+            // 4. Sağ-Alt Kadran (Sadece Beyaz Ara)
+            else if (x >= halfW && y >= halfH) {
+                const whiteScore = r + g + b;
+                if (whiteScore > maxWhite) { maxWhite = whiteScore; br = { x, y }; }
             }
         }
     }
 
-    if (!tl || !tr || !bl || !br) return null;
+    if (maxRed < 30 || maxGreen < 30 || maxBlue < 30) return null;
     return { tl, tr, bl, br };
 }
 
@@ -65,26 +73,27 @@ self.onmessage = function (e) {
     const corners = findCornerPoints(width, height, imgData);
     let bitString = "";
 
-    for (let row = 0; row < gridSize; row++) {
-        for (let col = 0; col < gridSize; col++) {
-            // Köşeleri Atla
+    const targetGrid = gridSize || 16;
+
+    for (let row = 0; row < targetGrid; row++) {
+        for (let col = 0; col < targetGrid; col++) {
             if ((row === 0 && col === 0) || 
-                (row === 0 && col === gridSize - 1) || 
-                (row === gridSize - 1 && col === 0) || 
-                (row === gridSize - 1 && col === gridSize - 1)) {
+                (row === 0 && col === targetGrid - 1) || 
+                (row === targetGrid - 1 && col === 0) || 
+                (row === targetGrid - 1 && col === targetGrid - 1)) {
                 continue;
             }
 
             let px, py;
             if (corners) {
-                const u = (col + 0.5) / gridSize;
-                const v = (row + 0.5) / gridSize;
+                const u = (col + 0.5) / targetGrid;
+                const v = (row + 0.5) / targetGrid;
                 const pt = getInterpolatedPoint(u, v, corners);
                 px = pt.x;
                 py = pt.y;
             } else {
-                const cellSizeX = width / gridSize;
-                const cellSizeY = height / gridSize;
+                const cellSizeX = width / targetGrid;
+                const cellSizeY = height / targetGrid;
                 px = Math.floor(col * cellSizeX + cellSizeX / 2);
                 py = Math.floor(row * cellSizeY + cellSizeY / 2);
             }
@@ -94,9 +103,9 @@ self.onmessage = function (e) {
                 const r = imgData[idx];
                 const g = imgData[idx + 1];
                 const b = imgData[idx + 2];
-                bitString += classifyBW(r, g, b);
+                bitString += classifyColor(r, g, b);
             } else {
-                bitString += '0';
+                bitString += '00';
             }
         }
     }

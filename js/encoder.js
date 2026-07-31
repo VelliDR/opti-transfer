@@ -1,16 +1,23 @@
 /**
- * Canvas Üzerinde Siyah-Beyaz Matris Oluşturucu
+ * Canvas Üzerinde 16x16 Renkli Matris Oluşturucu
  */
 
+export const COLOR_MAP = {
+    '00': '#000000', // Siyah
+    '01': '#FFFFFF', // Beyaz
+    '10': '#FF0000', // Saf Kırmızı
+    '11': '#0000FF'  // Saf Mavi
+};
+
 export class MatrixEncoder {
-    constructor(canvas, gridSize = 16) {
+    constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        this.gridSize = gridSize;
+        this.gridSize = 16;
         this.timerId = null;
         this.currentFrame = 0;
         this.packets = [];
-        this.fps = 12; // Kararlı 12-15 FPS
+        this.fps = 15;
     }
 
     setPackets(packets) {
@@ -33,11 +40,11 @@ export class MatrixEncoder {
     renderFrame(packet) {
         if (!packet) return;
 
+        // Köşelerin CSS tarafından kesilmesini önleyen %5 koruma payı
         const padding = Math.floor(this.canvas.width * 0.05);
         const drawableWidth = this.canvas.width - (padding * 2);
         const cellSize = drawableWidth / this.gridSize;
 
-        // Arka planı temizle
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         const bitString = this.packetToBits(packet);
@@ -48,22 +55,23 @@ export class MatrixEncoder {
                 const x = padding + (col * cellSize);
                 const y = padding + (row * cellSize);
 
-                // 1. Köşe Oryantasyon Blokları (Bulucu Desenler)
-                if ((row === 0 && col === 0) || 
-                    (row === 0 && col === this.gridSize - 1) || 
-                    (row === this.gridSize - 1 && col === 0)) {
-                    this.ctx.fillStyle = '#FFFFFF'; // Sol-Üst, Sağ-Üst, Sol-Alt: Beyaz
+                // 1. Dört Köşe Kalibrasyon Blokları
+                if (row === 0 && col === 0) {
+                    this.ctx.fillStyle = '#FF0000'; // Sol-Üst: Kırmızı
+                } else if (row === 0 && col === this.gridSize - 1) {
+                    this.ctx.fillStyle = '#00FF00'; // Sağ-Üst: Yeşil
+                } else if (row === this.gridSize - 1 && col === 0) {
+                    this.ctx.fillStyle = '#0000FF'; // Sol-Alt: Mavi
                 } else if (row === this.gridSize - 1 && col === this.gridSize - 1) {
-                    this.ctx.fillStyle = '#000000'; // Sağ-Alt: Siyah
+                    this.ctx.fillStyle = '#FFFFFF'; // Sağ-Alt: Beyaz
                 } 
-                // 2. Veri Hücreleri (Siyah / Beyaz)
+                // 2. Renkli Veri Hücreleri (2 Bit/Hücre)
                 else {
-                    if (bitIndex < bitString.length) {
-                        const bit = bitString[bitIndex];
-                        this.ctx.fillStyle = (bit === '1') ? '#FFFFFF' : '#000000';
-                        bitIndex++;
+                    if (bitIndex < bitString.length - 1) {
+                        const twoBits = bitString.substr(bitIndex, 2);
+                        this.ctx.fillStyle = COLOR_MAP[twoBits] || '#000000';
+                        bitIndex += 2;
                     } else {
-                        // Nötr Dolgu
                         this.ctx.fillStyle = '#000000';
                     }
                 }

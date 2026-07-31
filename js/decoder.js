@@ -1,5 +1,5 @@
 /**
- * Kamera Taraması, FPS Sınırlaması ve Gerçek Kamera Seçici
+ * Kamera Taraması, Web Worker Entegrasyonu ve Donanım Yöneticisi
  */
 
 import { parsePacket } from './chunker.js';
@@ -13,6 +13,7 @@ export class MatrixDecoder {
         this.onComplete = onComplete;
         
         this.gridSize = 16;
+
         this.receivedPackets = new Map();
         this.totalPackets = 0;
         this.isScanning = false;
@@ -21,16 +22,12 @@ export class MatrixDecoder {
 
         this.torchState = false;
 
-        // Web Worker
         this.worker = new Worker('js/worker.js');
         this.isWorkerBusy = false;
         this.setupWorker();
 
-        // Metrikler ve FPS Throttle
         this.startTime = null;
         this.totalBytesReceived = 0;
-        this.lastScanTime = 0;
-        this.targetScanInterval = 1000 / 15; // Saniyede Maksimum 15 Tarama (60 FPS kilitlenmesini engeller)
     }
 
     setupWorker() {
@@ -49,23 +46,16 @@ export class MatrixDecoder {
     }
 
     async startCamera(deviceId = null) {
-        this.stopCamera(); // Önceki yayını tamamen öldür
+        this.stopCamera();
 
-        let constraints;
-        if (deviceId) {
-            constraints = { video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 640 } } };
-        } else {
-            constraints = { video: { facingMode: { exact: "environment" }, width: { ideal: 640 }, height: { ideal: 640 } } };
-        }
+        const constraints = {
+            video: deviceId 
+                ? { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 640 } }
+                : { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 640 } }
+        };
 
         try {
-            try {
-                this.stream = await navigator.mediaDevices.getUserMedia(constraints);
-            } catch (e) {
-                // Esnek fallback
-                this.stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            }
-
+            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
             this.video.srcObject = this.stream;
             await this.video.play();
 
@@ -75,7 +65,6 @@ export class MatrixDecoder {
             this.startTime = null;
             this.totalBytesReceived = 0;
             this.torchState = false;
-            this.lastScanTime = 0;
             
             this.scanLoop();
             return true;
@@ -116,34 +105,29 @@ export class MatrixDecoder {
         }
     }
 
-    scanLoop(now = 0) {
+    scanLoop() {
         if (!this.isScanning) return;
 
-        // FPS Throttle: Ekran karıncalanmasını önlemek için 15 FPS sınırında tara
-        if (now - this.lastScanTime >= this.targetScanInterval) {
-            if (this.video.readyState === this.video.HAVE_ENOUGH_DATA && !this.isWorkerBusy) {
-                const width = this.video.videoWidth;
-                const height = this.video.videoHeight;
-                
-                this.canvas.width = width;
-                this.canvas.height = height;
-                this.ctx.drawImage(this.video, 0, 0, width, height);
+        if (this.video.readyState === this.video.HAVE_ENOUGH_DATA && !this.isWorkerBusy) {
+            const width = this.video.videoWidth;
+            const height = this.video.videoHeight;
+            
+            this.canvas.width = width;
+            this.canvas.height = height;
+            this.ctx.drawImage(this.video, 0, 0, width, height);
 
-                const imgData = this.ctx.getImageData(0, 0, width, height);
-                
-                this.isWorkerBusy = true;
-                this.lastScanTime = now;
-                
-                this.worker.postMessage({
-                    imgData: imgData.data,
-                    width: width,
-                    height: height,
-                    gridSize: this.gridSize
-                });
-            }
+            const imgData = this.ctx.getImageData(0, 0, width, height);
+            
+            this.isWorkerBusy = true;
+            this.worker.postMessage({
+                imgData: imgData.data,
+                width: width,
+                height: height,
+                gridSize: this.gridSize
+            });
         }
 
-        this.animFrameId = requestAnimationFrame((timestamp) => this.scanLoop(timestamp));
+        this.animFrameId = requestAnimationFrame(() => this.scanLoop());
     }
 
     handleParsedBits(bitString) {

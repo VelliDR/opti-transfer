@@ -56,8 +56,8 @@ export function unpackFileWithMetadata(combinedBuffer) {
     }
 }
 
-// Siyah-Beyaz 16x16 Matris İçin Optimum Payload = 25 Bayt
-export function chunkData(uint8Array, chunkSize = 25) {
+// 16x16 Renkli Matris İçin Tam Uyumlu Payload = 57 Bayt
+export function chunkData(uint8Array, chunkSize = 57) {
     const chunks = [];
     const totalChunks = Math.ceil(uint8Array.length / chunkSize);
     
@@ -67,6 +67,7 @@ export function chunkData(uint8Array, chunkSize = 25) {
         const chunkData = uint8Array.slice(start, end);
         const payloadLen = chunkData.length;
         
+        // 5B Header + Payload + 1B Checksum = Max 63 Bayt
         const packet = new Uint8Array(5 + payloadLen + 1);
         packet[0] = (i >> 8) & 0xFF;
         packet[1] = i & 0xFF;
