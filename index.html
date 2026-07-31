@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optik Transfer PWA</title>
+    <!-- Material Symbols & Google Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header & Material 3 Segmented Navigation -->
+        <header class="app-header">
+            <h1 class="app-title">OptiTransfer</h1>
+            <p class="app-subtitle">Air-Gapped Optik Veri Taşıma</p>
+            <div class="m3-segmented-button">
+                <button id="btnTabSender" class="segmented-item active">
+                    <span>Gönderici</span>
+                </button>
+                <button id="btnTabReceiver" class="segmented-item">
+                    <span>Alıcı</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="app-content">
+            <!-- ================= GÖNDERİCİ PANELİ (SEKME 1) ================= -->
+            <section id="senderPanel" class="m3-card panel">
+                <h2 class="panel-title">Veri Gönder</h2>
+
+                <!-- Parolasız Geçiş Switch -->
+                <div class="m3-switch-row">
+                    <label class="switch-label" for="toggleNoPasswordSend">
+                        <span>Parolasız Taşıma</span>
+                        <small>Şifreleme parolası girmeden hızlıca aktar</small>
+                    </label>
+                    <label class="m3-switch">
+                        <input type="checkbox" id="toggleNoPasswordSend">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="m3-input-group">
+                    <label class="input-label">Dosya Seçin</label>
+                    <input type="file" id="fileInput" class="m3-file-input">
+                </div>
+
+                <div class="m3-input-group" id="sendPasswordGroup">
+                    <label class="input-label" for="passwordInput">Güvenlik Parolası</label>
+                    <input type="password" id="passwordInput" class="m3-text-input" placeholder="AES-256 Parolası">
+                </div>
+
+                <div class="m3-input-group">
+                    <div class="slider-header">
+                        <label class="input-label">Ekran Yenileme Hızı</label>
+                        <span id="fpsDisplay" class="m3-badge">15 FPS</span>
+                    </div>
+                    <input type="range" id="fpsRange" min="1" max="60" value="15" class="m3-slider">
+                </div>
+
+                <div class="m3-button-row">
+                    <button id="btnStartSend" class="m3-btn m3-btn-primary">Yayını Başlat</button>
+                    <button id="btnStopSend" class="m3-btn m3-btn-outlined" disabled>Durdur</button>
+                </div>
+
+                <!-- Dosya ve Transfer Bilgi Kutuları -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Dosya Adı</span>
+                        <span id="statSendFileName" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Dosya Boyutu</span>
+                        <span id="statSendFileSize" class="stat-value">0 KB</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Toplam Paket</span>
+                        <span id="statSendTotalPackets" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Aktarım Türü</span>
+                        <span id="statSendMode" class="stat-value">Şifreli</span>
+                    </div>
+                </div>
+
+                <!-- Canvas Çerçevesi -->
+                <div class="visualizer-container">
+                    <canvas id="matrixCanvas" width="320" height="320"></canvas>
+                </div>
+                
+                <div id="senderStatus" class="m3-status-bar">Hazır</div>
+            </section>
+
+            <!-- ================= ALICI PANELİ (SEKME 2) ================= -->
+            <section id="receiverPanel" class="m3-card panel" style="display: none;">
+                <h2 class="panel-title">Veri Al</h2>
+
+                <!-- Kamera Seçimi -->
+                <div class="m3-input-group">
+                    <label class="input-label" for="cameraSelect">Kamera Seçimi</label>
+                    <select id="cameraSelect" class="m3-text-input"></select>
+                </div>
+
+                <!-- Parolasız Geçiş Switch -->
+                <div class="m3-switch-row">
+                    <label class="switch-label" for="toggleNoPasswordReceive">
+                        <span>Parolasız Alma</span>
+                        <small>Karşı taraf parolasız gönderdiyse açın</small>
+                    </label>
+                    <label class="m3-switch">
+                        <input type="checkbox" id="toggleNoPasswordReceive">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="m3-input-group" id="receivePasswordGroup">
+                    <label class="input-label" for="decryptPasswordInput">Şifre Çözme Parolası</label>
+                    <input type="password" id="decryptPasswordInput" class="m3-text-input" placeholder="Gönderici Parolası">
+                </div>
+
+                <div class="m3-button-row">
+                    <button id="btnStartCamera" class="m3-btn m3-btn-primary">Kamerayı Aç</button>
+                    <button id="btnToggleTorch" class="m3-btn m3-btn-outlined" disabled>Flaş Aç</button>
+                    <button id="btnStopCamera" class="m3-btn m3-btn-outlined" disabled>Kapat</button>
+                </div>
+
+                <!-- İlerleme Çubuğu -->
+                <div class="m3-progress-container">
+                    <div id="m3ProgressBar" class="m3-progress-bar"></div>
+                </div>
+
+                <!-- Canlı Transfer İstatistik Kutuları -->
+                <div class="stats-grid">
+                    <div class="stat-card highlight">
+                        <span class="stat-label">Transfer Hızı</span>
+                        <span id="statSpeed" class="stat-value">0.0 KB/s</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Geçen Süre</span>
+                        <span id="statElapsedTime" class="stat-value">0s</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Alınan Veri</span>
+                        <span id="statReceivedBytes" class="stat-value">0 KB</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Paket İlerlemesi</span>
+                        <span id="statPacketsRatio" class="stat-value">0 / 0</span>
+                    </div>
+                </div>
+
+                <!-- Kamera Görünümü -->
+                <div class="visualizer-container">
+                    <video id="cameraVideo" autoplay playsinline muted></video>
+                    <canvas id="processCanvas" style="display: none;"></canvas>
+                </div>
+
+                <div id="receiverStatus" class="m3-status-bar">Kamera Kapalı</div>
+            </section>
+        </main>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
