@@ -1,5 +1,5 @@
 /**
- * Web Worker - Akıllı Kadran Kısıtlı Renk Çözücü
+ * Web Worker - Güvenli ve Çökmesiz Kadranlı Renk Çözücü
  */
 
 function classifyColor(r, g, b) {
@@ -50,7 +50,10 @@ function findCornerPoints(width, height, data) {
         }
     }
 
-    if (maxRed < 30 || maxGreen < 30 || maxBlue < 30) return null;
+    // Dört köşeden biri bile yoksa güvenli bir şekilde null dön (Çökmeyi Engeller)
+    if (!tl || !tr || !bl || !br) return null;
+    if (maxRed < 20 || maxGreen < 20 || maxBlue < 20) return null;
+
     return { tl, tr, bl, br };
 }
 
@@ -69,44 +72,51 @@ function getInterpolatedPoint(u, v, corners) {
 }
 
 self.onmessage = function (e) {
-    const { imgData, width, height, gridSize } = e.data;
-    const corners = findCornerPoints(width, height, imgData);
-    let bitString = "";
+    try {
+        const { imgData, width, height, gridSize } = e.data;
+        const corners = findCornerPoints(width, height, imgData);
+        let bitString = "";
 
-    for (let row = 0; row < gridSize; row++) {
-        for (let col = 0; col < gridSize; col++) {
-            if ((row === 0 && col === 0) || 
-                (row === 0 && col === gridSize - 1) || 
-                (row === gridSize - 1 && col === 0) || 
-                (row === gridSize - 1 && col === gridSize - 1)) {
-                continue;
-            }
+        const targetGrid = gridSize || 16;
 
-            let px, py;
-            if (corners) {
-                const u = (col + 0.5) / gridSize;
-                const v = (row + 0.5) / gridSize;
-                const pt = getInterpolatedPoint(u, v, corners);
-                px = pt.x;
-                py = pt.y;
-            } else {
-                const cellSizeX = width / gridSize;
-                const cellSizeY = height / gridSize;
-                px = Math.floor(col * cellSizeX + cellSizeX / 2);
-                py = Math.floor(row * cellSizeY + cellSizeY / 2);
-            }
+        for (let row = 0; row < targetGrid; row++) {
+            for (let col = 0; col < targetGrid; col++) {
+                if ((row === 0 && col === 0) || 
+                    (row === 0 && col === targetGrid - 1) || 
+                    (row === targetGrid - 1 && col === 0) || 
+                    (row === targetGrid - 1 && col === targetGrid - 1)) {
+                    continue;
+                }
 
-            if (px >= 0 && px < width && py >= 0 && py < height) {
-                const idx = (py * width + px) * 4;
-                const r = imgData[idx];
-                const g = imgData[idx + 1];
-                const b = imgData[idx + 2];
-                bitString += classifyColor(r, g, b);
-            } else {
-                bitString += '00';
+                let px, py;
+                if (corners) {
+                    const u = (col + 0.5) / targetGrid;
+                    const v = (row + 0.5) / targetGrid;
+                    const pt = getInterpolatedPoint(u, v, corners);
+                    px = pt.x;
+                    py = pt.y;
+                } else {
+                    const cellSizeX = width / targetGrid;
+                    const cellSizeY = height / targetGrid;
+                    px = Math.floor(col * cellSizeX + cellSizeX / 2);
+                    py = Math.floor(row * cellSizeY + cellSizeY / 2);
+                }
+
+                if (px >= 0 && px < width && py >= 0 && py < height) {
+                    const idx = (py * width + px) * 4;
+                    const r = imgData[idx];
+                    const g = imgData[idx + 1];
+                    const b = imgData[idx + 2];
+                    bitString += classifyColor(r, g, b);
+                } else {
+                    bitString += '00';
+                }
             }
         }
-    }
 
-    self.postMessage({ bitString });
+        self.postMessage({ bitString });
+    } catch (err) {
+        // Hata durumunda bile ana kanala boş yanıt dön ki tarama kilitlenmesin
+        self.postMessage({ bitString: "" });
+    }
 };

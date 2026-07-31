@@ -32,10 +32,15 @@ export class MatrixDecoder {
     setupWorker() {
         this.worker.onmessage = (e) => {
             const { bitString } = e.data;
-            this.isWorkerBusy = false;
+            this.isWorkerBusy = false; // Bayrağı her koşulda sıfırla
             if (bitString) {
                 this.handleParsedBits(bitString);
             }
+        };
+
+        this.worker.onerror = (err) => {
+            console.error("Worker Hatası:", err);
+            this.isWorkerBusy = false; // Hata durumunda kilitlenmeyi engeller
         };
     }
 
@@ -141,7 +146,7 @@ export class MatrixDecoder {
         const parsed = parsePacket(new Uint8Array(bytes));
         
         if (parsed) {
-            // Mantıksız paket sayılarını reddet (65535 Koruması)
+            // 65535 gibi parazit sayılarını engelle
             if (parsed.totalPackets <= 0 || parsed.totalPackets > 5000) return;
             if (parsed.packetIndex >= parsed.totalPackets) return;
 
