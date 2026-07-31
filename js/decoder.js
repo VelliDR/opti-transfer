@@ -4,7 +4,6 @@
 
 import { parsePacket } from './chunker.js';
 
-// js/decoder.js içinde constructor güncellemesi
 export class MatrixDecoder {
     constructor(videoElement, processCanvas, onProgress, onComplete) {
         this.video = videoElement;
@@ -13,8 +12,7 @@ export class MatrixDecoder {
         this.onProgress = onProgress;
         this.onComplete = onComplete;
         
-        this.gridSize = 24; // 16 yerine 24 yapıldı
-    
+        this.gridSize = 16;
         this.receivedPackets = new Map();
         this.totalPackets = 0;
         this.isScanning = false;
